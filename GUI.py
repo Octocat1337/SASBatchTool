@@ -4,14 +4,67 @@ import os
 import SASEGCOM
 import json
 
+class CreateToolTip(object):
+    """
+    create a tooltip for a given widget
+    """
+    def __init__(self, widget, text='widget info'):
+        self.waittime = 100     #miliseconds
+        self.wraplength = 180   #pixels
+        self.widget = widget
+        self.text = text
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        self.widget.bind("<ButtonPress>", self.leave)
+        self.id = None
+        self.tw = None
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(self.waittime, self.showtip)
+
+    def unschedule(self):
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def showtip(self, event=None):
+        x = y = 0
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+        # creates a toplevel window
+        self.tw = tk.Toplevel(self.widget)
+        # Leaves only the label and removes the app window
+        self.tw.wm_overrideredirect(True)
+        self.tw.wm_geometry("+%d+%d" % (x, y))
+        label = tk.Label(self.tw, text=self.text, justify='left',
+                       background="#ffffff", relief='solid', borderwidth=1,
+                       wraplength = self.wraplength)
+        label.pack(ipadx=1)
+
+    def hidetip(self):
+        tw = self.tw
+        self.tw= None
+        if tw:
+            tw.destroy()
 
 class MainWindow:
     # Modules
     EXCELEG = None
-    SASEG = None  #TODO
+    SASEG = None
     #Global Vars
     current_folder = ''
     current_folder_files = []
+    search_performed = False
     # Initialize the main window
     root = None
 
@@ -64,26 +117,66 @@ class MainWindow:
         self.outer_frame.columnconfigure(2, weight=4)
         self.outer_frame.columnconfigure(3, weight=0)
 
-        self.outer_frame.rowconfigure(0, weight=1)
-        self.outer_frame.rowconfigure(1, weight=8)
-        self.outer_frame.rowconfigure(2, weight=1)
+        self.outer_frame.rowconfigure(0, weight=1)  # search bar
+        self.outer_frame.rowconfigure(1, weight=1)  # list label
+        self.outer_frame.rowconfigure(2, weight=8)  # list
+        self.outer_frame.rowconfigure(3, weight=1)  # current folder
+        self.outer_frame.rowconfigure(4, weight=1)  # progress bar
 
-        # 4 frames
+        # main frames
+
+        # top searchbar frame
+        self.top_searchbar_frame = tk.Frame(self.outer_frame, bg="seashell3")
+
         self.left_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
         self.mid_frame = tk.Frame(self.outer_frame, bg="seashell3")
         self.right_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
         self.functions_frame = tk.Frame(self.outer_frame, bg="seashell3")
+
+        # top searchbar
+        self.searchbar = tk.Entry(self.top_searchbar_frame, width=50)
+        self.searchbar.bind('<Return>', self.search_event)
+        self.searchbar.pack(side=tk.LEFT, expand=True, fill=tk.Y, padx=4)
+        self.btn_search = tk.Button(self.top_searchbar_frame, text='Search', padx=4, command=self.search)
+        self.btn_search.pack(side=tk.LEFT, padx=4, expand=True, fill=tk.Y)
+        self.closeimg = tk.PhotoImage(file='./src/close16.png')
+        self.btn_reset_searchbar = tk.Button(self.top_searchbar_frame, image=self.closeimg, command=self.reset_search)
+        self.btn_reset_searchbar.pack(side=tk.LEFT, padx=4, expand=True, fill=tk.Y)
+        self.btn_reset_searchbar.config(state="disabled")
+
         # left bottom and right bottom
         self.left_bottom_frame = tk.Frame(self.outer_frame, bg="seashell3")
 
         # labels above the two lists
-        self.left_label = tk.Label(self.outer_frame, text="Will Not Batch", width=50)
-        self.right_label = tk.Label(self.outer_frame, text="Will Batch", width=50)
+        self.left_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
+        self.right_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
+
+        self.sort_img = tk.PhotoImage(file='./src/sort-arrow-up16.png')
+
+        self.btn_sort_left = tk.Button(
+            self.left_label_frame, image=self.sort_img,command=self.sort_left_list)
+        self.btn_sort_right = tk.Button(
+            self.right_label_frame, image=self.sort_img, command=self.sort_right_list)
+
+        self.left_label = tk.Label(self.left_label_frame, text="Will Not Batch", width=50)
+        self.right_label = tk.Label(self.right_label_frame, text="Will Batch", width=50)
+
+        self.btn_sort_left.pack(side=tk.LEFT, padx=0, expand=True, fill=tk.Y)
+        self.left_label.pack(side=tk.LEFT, padx=(2,0), expand=True, fill=tk.Y)
+
+        self.btn_sort_right.pack(side=tk.LEFT, padx=0, expand=True, fill=tk.Y)
+        self.right_label.pack(side=tk.LEFT, padx=(2,0), expand=True, fill=tk.Y)
+
+        self.tooltip_left = CreateToolTip(self.btn_sort_left, 'sort by name')
+        self.tooltip_right = CreateToolTip(self.btn_sort_right, 'sort by name')
+
+        self.left_label_frame.grid(row=1, column=0, sticky='sw')
+        self.right_label_frame.grid(row=1, column=2, sticky='sw')
         # label to show current folder, left bottom corner
         self.current_folder_label = tk.Label(self.left_bottom_frame, text='Curent Folder:', justify='left')
         self.current_folder_text = tk.Label(self.left_bottom_frame, text='test folder name', justify='left')
 
-        # Buttons
+        # Middle Frame Buttons
         self.btn_up = tk.Button(self.mid_frame, text="move up", command=self.move_up)
         self.btn_down = tk.Button(self.mid_frame, text="move Down", command=self.move_down)
         self.btn_top = tk.Button(self.mid_frame, text="move to Top", command=self.move_to_top)
@@ -115,12 +208,18 @@ class MainWindow:
         ########## Grids: add buttons to layout ##########
         self.outer_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.left_label.grid(row=0, column=0, sticky="sw")
-        self.right_label.grid(row=0, column=2, sticky="sw")
-        self.left_listbox.grid(row=1, column=0, sticky="nsew")
-        self.mid_frame.grid(row=1, column=1, sticky='ns')
-        self.right_listbox.grid(row=1, column=2, sticky="nsew")
-        self.left_bottom_frame.grid(row=2, column=0, sticky='nsew', columnspan=3)
+        self.top_searchbar_frame.grid(row=0, column=0, sticky='sw', columnspan=3)
+
+        # self.left_label.grid(row=1, column=0, sticky="sw")
+        # self.right_label.grid(row=1, column=2, sticky="sw")
+
+        self.left_listbox.grid(row=2, column=0, sticky="nsew")
+        self.mid_frame.grid(row=2, column=1, sticky='ns')
+        self.right_listbox.grid(row=2, column=2, sticky="nsew")
+
+        self.left_bottom_frame.grid(row=3, column=0, sticky='nsew', columnspan=3)
+
+        self.functions_frame.grid(row=2, column=3, padx=5, pady=5, sticky="ns", rowspan=3)
 
         # mid buttons
         self.btn_top.grid(row=1, column=0, sticky="ns", padx=10, pady=10)
@@ -135,7 +234,6 @@ class MainWindow:
         self.current_folder_text.grid(row=1, column=0, sticky='w')
 
         # Rightmost functional buttons
-        self.functions_frame.grid(row=1, column=3, padx=5, pady=5, sticky="ns")
         self.btn_folder.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         self.btn_load_batch_list.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
         self.btn_save_batch_list.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
@@ -223,9 +321,9 @@ class MainWindow:
         selected_indices = self.right_listbox.curselection()
         # append to right list
         for index in selected_indices:
-            color = self.right_listbox.itemcget(index,'foreground')
+            color = self.right_listbox.itemcget(index, 'foreground')
             self.left_listbox.insert(tk.END, self.right_listbox.get(index))
-            self.left_listbox.itemconfig(self.left_listbox.size()-1 ,foreground=color)
+            self.left_listbox.itemconfig(self.left_listbox.size() - 1, foreground=color)
 
         # remove from left list
         for index in selected_indices[::-1]:
@@ -309,16 +407,13 @@ class MainWindow:
         i = 0
         for index in indices:
             item = curr_list.get(index - i)
-            color = curr_list.itemcget(index-i, 'foreground')
+            color = curr_list.itemcget(index - i, 'foreground')
             curr_list.delete(index - i)
             curr_list.insert(tk.END, item)
             if color != '':
-                curr_list.itemconfig(curr_list.size()-1, foreground=color)
-            curr_list.select_set(curr_list.size()-1)
+                curr_list.itemconfig(curr_list.size() - 1, foreground=color)
+            curr_list.select_set(curr_list.size() - 1)
             i += 1
-
-    def sort_by_name(self, file_list):
-        return
 
     def curr_list(self) -> tk.Listbox:
         tup1 = self.left_listbox.curselection()
@@ -336,7 +431,7 @@ class MainWindow:
         if len(right_list_items) == 0:
             return
         # make a new SAS EG each time
-        self.SASEG = SASEGCOM.SASEGHandler(file_list=right_list_items,folder=self.current_folder)
+        self.SASEG = SASEGCOM.SASEGHandler(file_list=right_list_items, folder=self.current_folder)
         # self.t = threading.Thread(target=self.batch)
         # self.t.start()
         #
@@ -425,6 +520,11 @@ class MainWindow:
     def get_combine_tlf(self):
         pass
 
+    def build_left_list(self, batchlist):
+        self.left_listbox.delete(0, tk.END)
+        for item in batchlist:
+            self.left_listbox.insert(tk.END, item)
+
     def build_right_list(self, batchlist):
         self.right_listbox.delete(0, tk.END)
         for item in batchlist:
@@ -443,10 +543,125 @@ class MainWindow:
         pass
 
     def sort_left_list(self):
-        pass
+        left_list = list(self.left_listbox.get(0, tk.END))
+        left_list.sort()
+        self.empty_left_list()
+        for file in left_list:
+            self.left_listbox.insert(tk.END, file)
 
-    def search_left_list(self):
-        pass
+    def sort_right_list(self):
+        right_list = list(self.right_listbox.get(0, tk.END))
+        right_list.sort()
+        self.empty_right_list()
+        for file in right_list:
+            self.right_listbox.insert(tk.END, file)
+
+    def search_event(self, event):
+        self.search()
+
+    def search(self):
+        '''
+        searches both lists and display results
+        not sure what to do
+        :return:
+        '''
+
+        # 1. get search text
+        text = self.searchbar.get()
+
+        if text == '':
+            # Case 1: User searched nothing
+            if not self.search_performed:
+                print('searched nothing, returning')
+                return
+            # Case 2: After normal search, user wants to proceed
+            else:
+                print('return from search result')
+                self.reset_search()
+                self.btn_search.config(state='normal')
+                self.btn_reset_searchbar.config(state='disabled')
+        else:
+            self.search_performed = True
+            self.btn_search.config(state='disabled')
+            self.btn_reset_searchbar.config(state='normal')
+
+        # 2. record current state
+        self.left_list = list(self.left_listbox.get(0, tk.END))
+        self.right_list = list(self.right_listbox.get(0, tk.END))
+        print('searchbarTxt: ' + text)
+
+        # 3. search two lists, remove found results from original lists
+        result_left = []
+        result_right = []
+
+        new_left_list = []
+        new_right_list = []
+
+        for item in self.left_list:
+            if text in item:
+                result_left.append(item)
+            # else:
+            #     new_left_list.append(item)
+
+        for item in self.right_list:
+            if text in item:
+                result_right.append(item)
+            # else:
+            #     new_right_list.append(item)
+
+        # self.left_list = new_left_list
+        # self.right_list = new_right_list
+
+        # 4. now result_ has the results, update the two list views
+
+        self.build_left_list(result_left)
+        self.build_right_list(result_right)
+
+    def reset_search(self):
+        '''
+        for the reset button right to the search bar
+        resets the search bar and modify the two lists
+        user presses this after they've done manipulating the search results
+        :return:
+        '''
+
+        text = self.searchbar.get()
+        if text == '' and not self.search_performed:
+            return
+        else:
+            self.btn_search.config(state='normal')
+            self.btn_reset_searchbar.config(state='disabled')
+            self.search_performed = False
+
+        self.searchbar.delete(0, tk.END)
+        left_list_tuple = self.left_listbox.get(0, tk.END)
+        right_list_tuple = self.right_listbox.get(0, tk.END)
+
+        # delete right list items from left list
+        left_set = set(self.left_list)
+        for item in right_list_tuple:
+            if item in left_set:
+                self.left_list.remove(item)
+
+        # delete left list items from right list
+        right_set = set(self.right_list)
+        for item in left_list_tuple:
+            if item in right_set:
+                self.right_list.remove(item)
+
+        # append to left list
+        for item in left_list_tuple:
+            if item not in left_set:
+                self.left_list.append(item)
+
+        # append to right list
+        for item in right_list_tuple:
+            if item not in right_set:
+                self.right_list.append(item)
+
+        self.build_left_list(self.left_list)
+        self.build_right_list(self.right_list)
+
 
 if __name__ == '__main__':
     mw = MainWindow()
