@@ -1,16 +1,20 @@
+import math
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
 import SASEGCOM
 import json
+import threading
+
 
 class CreateToolTip(object):
     """
     create a tooltip for a given widget
     """
+
     def __init__(self, widget, text='widget info'):
-        self.waittime = 100     #miliseconds
-        self.wraplength = 180   #pixels
+        self.waittime = 100  #miliseconds
+        self.wraplength = 180  #pixels
         self.widget = widget
         self.text = text
         self.widget.bind("<Enter>", self.enter)
@@ -47,15 +51,16 @@ class CreateToolTip(object):
         self.tw.wm_overrideredirect(True)
         self.tw.wm_geometry("+%d+%d" % (x, y))
         label = tk.Label(self.tw, text=self.text, justify='left',
-                       background="#ffffff", relief='solid', borderwidth=1,
-                       wraplength = self.wraplength)
+                         background="#ffffff", relief='solid', borderwidth=1,
+                         wraplength=self.wraplength)
         label.pack(ipadx=1)
 
     def hidetip(self):
         tw = self.tw
-        self.tw= None
+        self.tw = None
         if tw:
             tw.destroy()
+
 
 class MainWindow:
     # Modules
@@ -101,6 +106,7 @@ class MainWindow:
     btn_batch = None
     # bottom progress bar
     progress_bar = None
+    batch_thread = None
 
     def __init__(self):
         self.testnum = 0
@@ -134,7 +140,7 @@ class MainWindow:
         self.functions_frame = tk.Frame(self.outer_frame, bg="seashell3")
 
         # top searchbar
-        self.searchbar = tk.Entry(self.top_searchbar_frame, width=50)
+        self.searchbar = tk.Entry(self.top_searchbar_frame, width=30)
         self.searchbar.bind('<Return>', self.search_event)
         self.searchbar.pack(side=tk.LEFT, expand=True, fill=tk.Y, padx=4)
         self.btn_search = tk.Button(self.top_searchbar_frame, text='Search', padx=4, command=self.search)
@@ -154,7 +160,7 @@ class MainWindow:
         self.sort_img = tk.PhotoImage(file='./src/sort-arrow-up16.png')
 
         self.btn_sort_left = tk.Button(
-            self.left_label_frame, image=self.sort_img,command=self.sort_left_list)
+            self.left_label_frame, image=self.sort_img, command=self.sort_left_list)
         self.btn_sort_right = tk.Button(
             self.right_label_frame, image=self.sort_img, command=self.sort_right_list)
 
@@ -162,10 +168,10 @@ class MainWindow:
         self.right_label = tk.Label(self.right_label_frame, text="Will Batch", width=50)
 
         self.btn_sort_left.pack(side=tk.LEFT, padx=0, expand=True, fill=tk.Y)
-        self.left_label.pack(side=tk.LEFT, padx=(2,0), expand=True, fill=tk.Y)
+        self.left_label.pack(side=tk.LEFT, padx=(2, 0), expand=True, fill=tk.Y)
 
         self.btn_sort_right.pack(side=tk.LEFT, padx=0, expand=True, fill=tk.Y)
-        self.right_label.pack(side=tk.LEFT, padx=(2,0), expand=True, fill=tk.Y)
+        self.right_label.pack(side=tk.LEFT, padx=(2, 0), expand=True, fill=tk.Y)
 
         self.tooltip_left = CreateToolTip(self.btn_sort_left, 'sort by name')
         self.tooltip_right = CreateToolTip(self.btn_sort_right, 'sort by name')
@@ -191,8 +197,9 @@ class MainWindow:
         self.btn_get_topline_tlf = tk.Button(self.functions_frame, text='Get Topline TLF', command=self.get_topline_tlf)
         self.btn_get_intext_tlf = tk.Button(self.functions_frame, text='Get In-Text TLF', command=self.get_intext_tlf)
         self.btn_get_combine_tlf = tk.Button(self.functions_frame, text='Get Combine TLF', command=self.get_combine_tlf)
-        self.btn_batch = tk.Button(self.functions_frame, text="Batch", command=self.batch_run, bg="green", fg="white")
-
+        # self.btn_batch = tk.Button(self.functions_frame, text="Batch", command=self.batch_run, bg="green", fg="white")
+        self.btn_batch = tk.Button(self.functions_frame, text="Batch",
+                                   command=self.run_batch_thread, bg="green",fg="white")
         # ScrollBars
         self.scrollbar_l = tk.Scrollbar(self.left_listbox, orient=tk.VERTICAL, command=self.left_listbox.yview)
         self.scrollbar_r = tk.Scrollbar(self.right_listbox, orient=tk.VERTICAL, command=self.right_listbox.yview)
@@ -202,22 +209,28 @@ class MainWindow:
         self.scrollbar_r.pack(side="right", fill=tk.Y)
 
         # progress Bar
-        self.progress_bar = ttk.Progressbar(self.outer_frame, orient='horizontal', mode='determinate', length=100)
-        # self.progress_bar.grid(row=2, column=2)
+        self.progress_frame = tk.Frame(self.outer_frame, bg="seashell3")
+        self.progress_label = tk.Label(self.progress_frame, text='Batching:', width=30, anchor='w')
+        self.progress_bar = ttk.Progressbar(self.progress_frame,
+                            orient='horizontal', mode='determinate', length=200)
+        self.progress_label.pack(side=tk.LEFT, padx=0, expand=False, fill=tk.Y,anchor='nw')
+        self.progress_bar.pack(side=tk.LEFT, padx=(20,0), expand=True, fill=tk.Y, anchor='nw')
+
+
+
+        self.root.bind('<<event1>>', self.update_progress_bar)
 
         ########## Grids: add buttons to layout ##########
         self.outer_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         self.top_searchbar_frame.grid(row=0, column=0, sticky='sw', columnspan=3)
 
-        # self.left_label.grid(row=1, column=0, sticky="sw")
-        # self.right_label.grid(row=1, column=2, sticky="sw")
-
         self.left_listbox.grid(row=2, column=0, sticky="nsew")
         self.mid_frame.grid(row=2, column=1, sticky='ns')
         self.right_listbox.grid(row=2, column=2, sticky="nsew")
 
         self.left_bottom_frame.grid(row=3, column=0, sticky='nsew', columnspan=3)
+        self.progress_frame.grid(row=4, column=0, columnspan=4, sticky='ew')
 
         self.functions_frame.grid(row=2, column=3, padx=5, pady=5, sticky="ns", rowspan=3)
 
@@ -427,24 +440,23 @@ class MainWindow:
 
     def batch_run(self):
         # Get right_listbox items to batch
-        right_list_items = self.right_listbox.get(0, tk.END)
+        right_list_items = list(self.right_listbox.get(0, tk.END))
         if len(right_list_items) == 0:
             return
         # make a new SAS EG each time
         self.SASEG = SASEGCOM.SASEGHandler(file_list=right_list_items, folder=self.current_folder)
-        # self.t = threading.Thread(target=self.batch)
-        # self.t.start()
-        #
-        # self.progress_bar.start()
-        # self.t.join()
-        # self.progress_bar.stop()
+
         self.batch()
+
+        self.progress_label.config(text='Done')
+        self.progress_bar.config(value=100)
+
         messagebox.showinfo("Info", "Batch Complete")
 
     def batch(self):
         # self.testlist = [1]
-        # self.SASEG.batch_run_dummy(status_list=[])
-        self.SASEG.batch_run()
+        # self.SASEG.batch_run_dummy(status_list=[],root=self.root)
+        self.SASEG.batch_run(root=self.root)
 
     def empty_left_list(self):
         self.left_listbox.delete(0, tk.END)
@@ -572,11 +584,9 @@ class MainWindow:
         if text == '':
             # Case 1: User searched nothing
             if not self.search_performed:
-                print('searched nothing, returning')
                 return
             # Case 2: After normal search, user wants to proceed
             else:
-                print('return from search result')
                 self.reset_search()
                 self.btn_search.config(state='normal')
                 self.btn_reset_searchbar.config(state='disabled')
@@ -588,7 +598,6 @@ class MainWindow:
         # 2. record current state
         self.left_list = list(self.left_listbox.get(0, tk.END))
         self.right_list = list(self.right_listbox.get(0, tk.END))
-        print('searchbarTxt: ' + text)
 
         # 3. search two lists, remove found results from original lists
         result_left = []
@@ -662,6 +671,20 @@ class MainWindow:
         self.build_left_list(self.left_list)
         self.build_right_list(self.right_list)
 
+    def update_progress_bar(self,evt):
+        batch_list = list(self.right_listbox.get(0, tk.END))
+        total = len(batch_list)
+        index = evt.state
+        num = index + 1
+        pct = math.ceil(num/total * 90)
+
+        # print(evt.data)
+        self.progress_label.config(text='Batching: ' + batch_list[index])
+        self.progress_bar.config(value=pct)
+    def run_batch_thread(self):
+        self.batch_thread = threading.Thread(target=self.batch_run)
+        self.batch_thread.daemon=True
+        self.batch_thread.start()
 
 if __name__ == '__main__':
     mw = MainWindow()

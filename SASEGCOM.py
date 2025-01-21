@@ -22,12 +22,13 @@ class SASEGHandler:
         self.PROFILE_NAME = PROFILE_NAME
         self.EG_VERSION = EG_VERSION
 
-    def batch_run(self):
+    def batch_run(self, root=None):
         # Collect all items from List_R and perform your custom action
         print('===== SASEGCOM running: ======')
         if len(self.file_list) == 0:
             return
-        for file in self.file_list:
+        for index,file in enumerate(self.file_list):
+            root.event_generate("<<event1>>", when='tail', state=index)
             # Extract filename without extension
             file_name = Path(file).stem
             # cwd = os.getcwd()
@@ -71,11 +72,16 @@ class SASEGHandler:
                 continue
 
 
-    def batch_run_dummy(self, status_list=None):
-        print('=====Batching=====')
-        if len(self.file_list) == 0:
+    def batch_run_dummy(self, status_list=None, root=None):
+        print('=====Test Batching=====')
+        if len(self.file_list) == 0 or root is None:
+            if len(self.file_list) == 0:
+                print('no file to batch')
+            else:
+                print('did not get root')
             return
-        for file in self.file_list:
+
+        for index, file in enumerate(self.file_list):
             # Extract filename without extension
             file_name = Path(file).stem
             # cwd = os.getcwd()
@@ -85,7 +91,9 @@ class SASEGHandler:
             realcwd3 = realcwd2.replace("Z:", "/data1")
             file_path = realcwd3 + '/' + file
             print('batching: '+file_path)
-            sleep(1)
+            root.event_generate("<<event1>>", when='tail', state=index)
+            sleep(2)
+
 
     # TODO: need to test on large log file. Should I read by chunk ?
     def gbk_to_utf8(self, filename='', newFilename='', encoding_from='GB2312', encoding_to='UTF-8-sig'):
