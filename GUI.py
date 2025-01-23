@@ -79,8 +79,9 @@ class ProgressWindow(tk.Toplevel):
 
         self.update_idletasks()
         self.center_relative_to_master()  # Call the new centering function
-       # Bind the <Configure> event of the master window
+        # Bind the <Configure> event of the master window
         self.master.bind("<Configure>", self.recenter)
+
     def center_relative_to_master(self):
         master_x = self.master.winfo_rootx()
         master_y = self.master.winfo_rooty()
@@ -106,9 +107,11 @@ class ProgressWindow(tk.Toplevel):
             self.progress.stop()
             self.destroy()
 
-    def recenter(self, event=None): # Recenter function
-        self.update_idletasks() # Important to update the window size
+    def recenter(self, event=None):  # Recenter function
+        self.update_idletasks()  # Important to update the window size
         self.center_relative_to_master()
+
+
 class MainWindow:
     # Modules
     EXCELHandler = None
@@ -151,6 +154,7 @@ class MainWindow:
 
     # bottom button
     btn_batch = None
+    btn_stop = None
     # bottom progress bar
     progress_bar = None
     batch_thread = None
@@ -211,9 +215,9 @@ class MainWindow:
 
         # left bottom and right bottom
         self.left_bottom_frame = tk.Frame(self.outer_frame, bg="seashell3")
-        self.left_bottom_frame.rowconfigure(0,weight=1)
-        self.left_bottom_frame.rowconfigure(1,weight=1)
-        self.left_bottom_frame.columnconfigure(0,weight=1)
+        self.left_bottom_frame.rowconfigure(0, weight=1)
+        self.left_bottom_frame.rowconfigure(1, weight=1)
+        self.left_bottom_frame.columnconfigure(0, weight=1)
         # labels above the two lists
         self.left_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
         self.right_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
@@ -260,7 +264,9 @@ class MainWindow:
         self.btn_get_combine_tlf = tk.Button(self.functions_frame, text='Get Combine TLF', command=self.get_combine_tlf)
         # self.btn_batch = tk.Button(self.functions_frame, text="Batch", command=self.batch_run, bg="green", fg="white")
         self.btn_batch = tk.Button(self.functions_frame, text="Batch",
-                                   command=self.run_batch_thread, bg="#385f30", fg="white",font=("Arial", 16))
+                                   command=self.run_batch_thread, bg="#385f30", fg="white", font=("Arial", 16))
+        self.btn_stop = tk.Button(self.functions_frame, text="Stop",
+                                  command=self.stop_batch, bg="#803328", fg="white", font=("Arial", 16))
         # ScrollBars
         self.scrollbar_l = tk.Scrollbar(self.left_listbox, orient=tk.VERTICAL, command=self.left_listbox.yview)
         self.scrollbar_r = tk.Scrollbar(self.right_listbox, orient=tk.VERTICAL, command=self.right_listbox.yview)
@@ -271,18 +277,19 @@ class MainWindow:
 
         # progress Bar
         self.progress_frame = tk.Frame(self.outer_frame, bg="seashell3")
-        self.progress_label = tk.Label(self.progress_frame, text='Batching:', width=30, anchor='w',background='seashell3')
+        self.progress_label = tk.Label(self.progress_frame, text='Batching:', width=30, anchor='w',
+                                       background='seashell3')
         self.progress_bar = ttk.Progressbar(self.progress_frame,
                                             orient='horizontal', mode='determinate', length=200)
         # self.progress_label.pack(side=tk.LEFT, padx=0, expand=False, fill=tk.Y, anchor='nw')
         # self.progress_bar.pack(side=tk.LEFT, padx=(20, 0), expand=True, fill=tk.Y, anchor='nw')
 
-        self.progress_frame.rowconfigure(0,weight=1)
-        self.progress_frame.rowconfigure(1,weight=1)
-        self.progress_frame.columnconfigure(0,weight=1)
+        self.progress_frame.rowconfigure(0, weight=1)
+        self.progress_frame.rowconfigure(1, weight=1)
+        self.progress_frame.columnconfigure(0, weight=1)
 
-        self.progress_label.grid(row=0,column=0,sticky='ew')
-        self.progress_bar.grid(row=1,column=0,sticky='ew')
+        self.progress_label.grid(row=0, column=0, sticky='ew')
+        self.progress_bar.grid(row=1, column=0, sticky='ew')
 
         # SASEG event progressbar
         self.root.bind('<<event1>>', self.update_progress_bar)
@@ -316,24 +323,37 @@ class MainWindow:
         self.current_folder_text.grid(row=1, column=0, sticky='ew')
 
         # Rightmost functional buttons
-        self.btn_folder.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_load_batch_list.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_save_batch_list.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
-        self.label_placeholder = tk.Label(self.functions_frame,text='', background='seashell3')
-        self.label_placeholder.grid(row=3,column=0,sticky='nsew')
+        self.btn_folder.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
+        self.btn_load_batch_list.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        self.btn_save_batch_list.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
+        self.label_placeholder = tk.Label(self.functions_frame, text='', background='seashell3')
+        self.label_placeholder.grid(row=3, column=0, sticky='nsew')
 
-        self.btn_get_topline_tlf.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_get_intext_tlf.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_get_combine_tlf.grid(row=6, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_batch.grid(row=7, column=0, sticky="nsew", padx=10, pady=15,rowspan=2)
-
+        self.btn_get_topline_tlf.grid(row=4, column=0, sticky="ew", padx=10, pady=5)
+        self.btn_get_intext_tlf.grid(row=5, column=0, sticky="ew", padx=10, pady=5)
+        self.btn_get_combine_tlf.grid(row=6, column=0, sticky="ew", padx=10, pady=5)
+        self.btn_batch.grid(row=7, column=0, sticky="nsew", padx=10, pady=5)
+        self.btn_stop.grid(row=8, column=0, sticky="nsew", padx=10, pady=5)
         ########## Other setup procedures: init functions ##########
         # get current folder
         self.select_folder()
         # setup left list
         self.build_left_list_from_folder()
-
+        self.center_window()  # Center the window
         print('===== Init Done =====')
+
+    def center_window(self):
+        # pass
+        # self.root.eval('tk::PlaceWindow %s center' % self.root.winfo_toplevel())
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
+
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+
+        self.root.geometry(f"+{x}+{y}")
 
     def select_folder(self, folderpath=''):
         selected_folder = ''
@@ -531,6 +551,11 @@ class MainWindow:
         # self.SASEG.batch_run_dummy(status_list=[],root=self.root)
         self.SASEG.batch_run(root=self.root)
 
+    def stop_batch(self):
+        if self.SASEG is None:
+            return
+        self.SASEG.stop = True
+
     def empty_left_list(self):
         self.left_listbox.delete(0, tk.END)
 
@@ -597,7 +622,7 @@ class MainWindow:
             f.write(batchlist)
 
     def get_topline_tlf(self):
-        if 'program' in self.current_folder\
+        if 'program' in self.current_folder \
                 and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
             self.excel_thread = threading.Thread(target=self.get_topline_tlf_run)
             self.excel_thread.daemon = True
@@ -609,7 +634,7 @@ class MainWindow:
         # self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder,dummy=True)
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
         # file_list_r = self.EXCELHandler.get_filelist(type='topline')
-        file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline',root=self.root)
+        file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline', root=self.root)
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -638,7 +663,7 @@ class MainWindow:
                 self.right_listbox.itemconfig(index, foreground='red')
 
     def get_intext_tlf(self):
-        if 'program' in self.current_folder\
+        if 'program' in self.current_folder \
                 and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
             self.excel_thread = threading.Thread(target=self.get_intext_tlf_run)
             self.excel_thread.daemon = True
@@ -646,7 +671,7 @@ class MainWindow:
 
     def get_intext_tlf_run(self):
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        file_list_r = self.EXCELHandler.get_filelist(type='in-text',root=self.root)
+        file_list_r = self.EXCELHandler.get_filelist(type='in-text', root=self.root)
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -675,7 +700,7 @@ class MainWindow:
                 self.right_listbox.itemconfig(index, foreground='red')
 
     def get_combine_tlf(self):
-        if 'program' in self.current_folder\
+        if 'program' in self.current_folder \
                 and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
             self.excel_thread = threading.Thread(target=self.get_combine_tlf_run)
             self.excel_thread.daemon = True
@@ -683,7 +708,7 @@ class MainWindow:
 
     def get_combine_tlf_run(self):
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        file_list_r = self.EXCELHandler.get_filelist(type='combine',root=self.root)
+        file_list_r = self.EXCELHandler.get_filelist(type='combine', root=self.root)
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)

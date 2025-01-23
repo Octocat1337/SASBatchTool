@@ -8,6 +8,7 @@ class SASEGHandler:
     file_list = None
     PROFILE_NAME = ''
     EG_VERSION = ''
+    stop = False
 
     def __init__(self, file_list=None, folder='',PROFILE_NAME="sasserver", EG_VERSION="8.1"):
         """
@@ -27,7 +28,11 @@ class SASEGHandler:
         print('===== SASEGCOM running: ======')
         if len(self.file_list) == 0:
             return
+        self.stop = False
         for index,file in enumerate(self.file_list):
+            if self.stop:
+                self.stop = False
+                return
             root.event_generate("<<event1>>", when='tail', state=index)
             # Extract filename without extension
             file_name = Path(file).stem
@@ -74,14 +79,19 @@ class SASEGHandler:
 
     def batch_run_dummy(self, status_list=None, root=None):
         print('=====Test Batching=====')
+
         if len(self.file_list) == 0 or root is None:
             if len(self.file_list) == 0:
                 print('no file to batch')
             else:
                 print('did not get root')
             return
-
+        self.stop = False
         for index, file in enumerate(self.file_list):
+            if self.stop:
+                self.stop = False
+                print('Stop button pressed !')
+                return
             # Extract filename without extension
             file_name = Path(file).stem
             # cwd = os.getcwd()
