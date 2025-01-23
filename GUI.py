@@ -2,7 +2,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
-import SASEGCOM
+import SASEGCOM, EXCELCOM
 import json
 import threading
 
@@ -62,9 +62,56 @@ class CreateToolTip(object):
             tw.destroy()
 
 
+class ProgressWindow(tk.Toplevel):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.overrideredirect(True)
+        self.attributes('-topmost', True)
+        self.config(highlightthickness=0, bd=0)
+
+        self.progress = ttk.Progressbar(self, mode="indeterminate")
+        self.progress.pack(padx=10, pady=(10, 0))
+
+        self.label = tk.Label(self, text="Running Excel", bg=self.cget("background"))
+        self.label.pack(padx=10, pady=(0, 10))
+
+        self.running = False
+
+        self.update_idletasks()
+        self.center_relative_to_master()  # Call the new centering function
+       # Bind the <Configure> event of the master window
+        self.master.bind("<Configure>", self.recenter)
+    def center_relative_to_master(self):
+        master_x = self.master.winfo_rootx()
+        master_y = self.master.winfo_rooty()
+        master_width = self.master.winfo_width()
+        master_height = self.master.winfo_height()
+
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+
+        x = master_x + (master_width - window_width) // 2
+        y = master_y + (master_height - window_height) // 2
+
+        self.geometry(f"+{x}+{y}")
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.progress.start()
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            self.progress.stop()
+            self.destroy()
+
+    def recenter(self, event=None): # Recenter function
+        self.update_idletasks() # Important to update the window size
+        self.center_relative_to_master()
 class MainWindow:
     # Modules
-    EXCELEG = None
+    EXCELHandler = None
     SASEG = None
     #Global Vars
     current_folder = ''
@@ -107,6 +154,8 @@ class MainWindow:
     # bottom progress bar
     progress_bar = None
     batch_thread = None
+    excel_thread = None
+    excel_progress_window = None
 
     def __init__(self):
         self.testnum = 0
@@ -137,7 +186,17 @@ class MainWindow:
         self.left_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
         self.mid_frame = tk.Frame(self.outer_frame, bg="seashell3")
         self.right_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
+        # right functions frame
         self.functions_frame = tk.Frame(self.outer_frame, bg="seashell3")
+        self.functions_frame.rowconfigure(0, weight=1)
+        self.functions_frame.rowconfigure(1, weight=1)
+        self.functions_frame.rowconfigure(2, weight=1)
+        self.functions_frame.rowconfigure(3, weight=1)
+        self.functions_frame.rowconfigure(4, weight=1)
+        self.functions_frame.rowconfigure(5, weight=1)
+        self.functions_frame.rowconfigure(6, weight=1)
+        self.functions_frame.rowconfigure(7, weight=2)
+        self.functions_frame.rowconfigure(8, weight=2)
 
         # top searchbar
         self.searchbar = tk.Entry(self.top_searchbar_frame, width=30)
@@ -152,7 +211,9 @@ class MainWindow:
 
         # left bottom and right bottom
         self.left_bottom_frame = tk.Frame(self.outer_frame, bg="seashell3")
-
+        self.left_bottom_frame.rowconfigure(0,weight=1)
+        self.left_bottom_frame.rowconfigure(1,weight=1)
+        self.left_bottom_frame.columnconfigure(0,weight=1)
         # labels above the two lists
         self.left_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
         self.right_label_frame = tk.Frame(self.outer_frame, bg="seashell3")
@@ -199,7 +260,7 @@ class MainWindow:
         self.btn_get_combine_tlf = tk.Button(self.functions_frame, text='Get Combine TLF', command=self.get_combine_tlf)
         # self.btn_batch = tk.Button(self.functions_frame, text="Batch", command=self.batch_run, bg="green", fg="white")
         self.btn_batch = tk.Button(self.functions_frame, text="Batch",
-                                   command=self.run_batch_thread, bg="green",fg="white")
+                                   command=self.run_batch_thread, bg="#385f30", fg="white",font=("Arial", 16))
         # ScrollBars
         self.scrollbar_l = tk.Scrollbar(self.left_listbox, orient=tk.VERTICAL, command=self.left_listbox.yview)
         self.scrollbar_r = tk.Scrollbar(self.right_listbox, orient=tk.VERTICAL, command=self.right_listbox.yview)
@@ -210,15 +271,23 @@ class MainWindow:
 
         # progress Bar
         self.progress_frame = tk.Frame(self.outer_frame, bg="seashell3")
-        self.progress_label = tk.Label(self.progress_frame, text='Batching:', width=30, anchor='w')
+        self.progress_label = tk.Label(self.progress_frame, text='Batching:', width=30, anchor='w',background='seashell3')
         self.progress_bar = ttk.Progressbar(self.progress_frame,
-                            orient='horizontal', mode='determinate', length=200)
-        self.progress_label.pack(side=tk.LEFT, padx=0, expand=False, fill=tk.Y,anchor='nw')
-        self.progress_bar.pack(side=tk.LEFT, padx=(20,0), expand=True, fill=tk.Y, anchor='nw')
+                                            orient='horizontal', mode='determinate', length=200)
+        # self.progress_label.pack(side=tk.LEFT, padx=0, expand=False, fill=tk.Y, anchor='nw')
+        # self.progress_bar.pack(side=tk.LEFT, padx=(20, 0), expand=True, fill=tk.Y, anchor='nw')
 
+        self.progress_frame.rowconfigure(0,weight=1)
+        self.progress_frame.rowconfigure(1,weight=1)
+        self.progress_frame.columnconfigure(0,weight=1)
 
+        self.progress_label.grid(row=0,column=0,sticky='ew')
+        self.progress_bar.grid(row=1,column=0,sticky='ew')
 
+        # SASEG event progressbar
         self.root.bind('<<event1>>', self.update_progress_bar)
+        # EXCEL event progress window
+        self.root.bind('<<event2>>', self.progress_window)
 
         ########## Grids: add buttons to layout ##########
         self.outer_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
@@ -230,7 +299,7 @@ class MainWindow:
         self.right_listbox.grid(row=2, column=2, sticky="nsew")
 
         self.left_bottom_frame.grid(row=3, column=0, sticky='nsew', columnspan=3)
-        self.progress_frame.grid(row=4, column=0, columnspan=4, sticky='ew')
+        self.progress_frame.grid(row=4, column=0, columnspan=3, sticky='ew')
 
         self.functions_frame.grid(row=2, column=3, padx=5, pady=5, sticky="ns", rowspan=3)
 
@@ -244,22 +313,26 @@ class MainWindow:
 
         # Batch Button / bottom buttons: todo
         self.current_folder_label.grid(row=0, column=0, sticky='w')
-        self.current_folder_text.grid(row=1, column=0, sticky='w')
+        self.current_folder_text.grid(row=1, column=0, sticky='ew')
 
         # Rightmost functional buttons
         self.btn_folder.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         self.btn_load_batch_list.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
         self.btn_save_batch_list.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        self.label_placeholder = tk.Label(self.functions_frame,text='', background='seashell3')
+        self.label_placeholder.grid(row=3,column=0,sticky='nsew')
+
         self.btn_get_topline_tlf.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
         self.btn_get_intext_tlf.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
         self.btn_get_combine_tlf.grid(row=6, column=0, sticky="ew", padx=10, pady=10)
-        self.btn_batch.grid(row=8, column=0, sticky="nsew", padx=10, pady=15)
+        self.btn_batch.grid(row=7, column=0, sticky="nsew", padx=10, pady=15,rowspan=2)
 
         ########## Other setup procedures: init functions ##########
         # get current folder
         self.select_folder()
         # setup left list
         self.build_left_list_from_folder()
+
         print('===== Init Done =====')
 
     def select_folder(self, folderpath=''):
@@ -524,13 +597,119 @@ class MainWindow:
             f.write(batchlist)
 
     def get_topline_tlf(self):
-        pass
+        if 'program' in self.current_folder\
+                and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
+            self.excel_thread = threading.Thread(target=self.get_topline_tlf_run)
+            self.excel_thread.daemon = True
+            self.excel_thread.start()
+        else:
+            return
+
+    def get_topline_tlf_run(self):
+        # self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder,dummy=True)
+        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
+        # file_list_r = self.EXCELHandler.get_filelist(type='topline')
+        file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline',root=self.root)
+
+        # still, read all files in the batch list file folder
+        file_list_tmp = os.listdir(self.current_folder)
+
+        file_list_l = []
+        # get all files ending with .sas in the current folder
+        for file in file_list_tmp:
+            if file.endswith(".sas"):
+                file_list_l.append(file)
+
+        # compare with current all files, maybe something in batch list was deleted
+        # Case 1. right list has something that no longer exists
+        file_not_exist = list(set(file_list_r).difference(file_list_l))
+        file_not_exist_set = set(file_not_exist)
+        # Case 2. after case1, remove same items from left list
+        file_list_l = [x for x in file_list_l if x not in set(file_list_r)]
+
+        # in the end, build left list
+        self.empty_left_list()
+        for file in file_list_l:
+            self.left_listbox.insert(tk.END, file)
+        # build right list
+        self.build_right_list(file_list_r)
+        for index, item in enumerate(file_list_r):
+            if item in file_not_exist_set:
+                self.right_listbox.itemconfig(index, foreground='red')
 
     def get_intext_tlf(self):
-        pass
+        if 'program' in self.current_folder\
+                and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
+            self.excel_thread = threading.Thread(target=self.get_intext_tlf_run)
+            self.excel_thread.daemon = True
+            self.excel_thread.start()
+
+    def get_intext_tlf_run(self):
+        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
+        file_list_r = self.EXCELHandler.get_filelist(type='in-text',root=self.root)
+
+        # still, read all files in the batch list file folder
+        file_list_tmp = os.listdir(self.current_folder)
+
+        file_list_l = []
+        # get all files ending with .sas in the current folder
+        for file in file_list_tmp:
+            if file.endswith(".sas"):
+                file_list_l.append(file)
+
+        # compare with current all files, maybe something in batch list was deleted
+        # Case 1. right list has something that no longer exists
+        file_not_exist = list(set(file_list_r).difference(file_list_l))
+        file_not_exist_set = set(file_not_exist)
+        # Case 2. after case1, remove same items from left list
+        file_list_l = [x for x in file_list_l if x not in set(file_list_r)]
+
+        # in the end, build left list
+        self.empty_left_list()
+        for file in file_list_l:
+            self.left_listbox.insert(tk.END, file)
+        # build right list
+        self.build_right_list(file_list_r)
+        for index, item in enumerate(file_list_r):
+            if item in file_not_exist_set:
+                self.right_listbox.itemconfig(index, foreground='red')
 
     def get_combine_tlf(self):
-        pass
+        if 'program' in self.current_folder\
+                and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
+            self.excel_thread = threading.Thread(target=self.get_combine_tlf_run)
+            self.excel_thread.daemon = True
+            self.excel_thread.start()
+
+    def get_combine_tlf_run(self):
+        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
+        file_list_r = self.EXCELHandler.get_filelist(type='combine',root=self.root)
+
+        # still, read all files in the batch list file folder
+        file_list_tmp = os.listdir(self.current_folder)
+
+        file_list_l = []
+        # get all files ending with .sas in the current folder
+        for file in file_list_tmp:
+            if file.endswith(".sas"):
+                file_list_l.append(file)
+
+        # compare with current all files, maybe something in batch list was deleted
+        # Case 1. right list has something that no longer exists
+        file_not_exist = list(set(file_list_r).difference(file_list_l))
+        file_not_exist_set = set(file_not_exist)
+        # Case 2. after case1, remove same items from left list
+        file_list_l = [x for x in file_list_l if x not in set(file_list_r)]
+
+        # in the end, build left list
+        self.empty_left_list()
+        for file in file_list_l:
+            self.left_listbox.insert(tk.END, file)
+        # build right list
+        self.build_right_list(file_list_r)
+        for index, item in enumerate(file_list_r):
+            if item in file_not_exist_set:
+                self.right_listbox.itemconfig(index, foreground='red')
 
     def build_left_list(self, batchlist):
         self.left_listbox.delete(0, tk.END)
@@ -671,20 +850,35 @@ class MainWindow:
         self.build_left_list(self.left_list)
         self.build_right_list(self.right_list)
 
-    def update_progress_bar(self,evt):
+    def update_progress_bar(self, evt):
         batch_list = list(self.right_listbox.get(0, tk.END))
         total = len(batch_list)
         index = evt.state
         num = index + 1
-        pct = math.ceil(num/total * 90)
+        pct = math.ceil(num / total * 90)
 
         # print(evt.data)
         self.progress_label.config(text='Batching: ' + batch_list[index])
         self.progress_bar.config(value=pct)
+
     def run_batch_thread(self):
         self.batch_thread = threading.Thread(target=self.batch_run)
-        self.batch_thread.daemon=True
+        self.batch_thread.daemon = True
         self.batch_thread.start()
+
+    def progress_window(self, evt):
+        if evt.state == 1:
+            # EXCEL progress window
+            self.excel_progress_window = ProgressWindow()
+            self.excel_progress_window.start()
+            pass
+        else:
+            # stop the progress bar and close the window
+            self.excel_progress_window.stop()
+            self.excel_progress_window = None
+            pass
+        pass
+
 
 if __name__ == '__main__':
     mw = MainWindow()
