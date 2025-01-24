@@ -249,12 +249,16 @@ class MainWindow:
         self.current_folder_text = tk.Label(self.left_bottom_frame, text='test folder name', justify='left')
 
         # Middle Frame Buttons
-        self.btn_up = tk.Button(self.mid_frame, text="move up", command=self.move_up)
-        self.btn_down = tk.Button(self.mid_frame, text="move Down", command=self.move_down)
-        self.btn_top = tk.Button(self.mid_frame, text="move to Top", command=self.move_to_top)
-        self.btn_bottom = tk.Button(self.mid_frame, text="move to Bottom", command=self.move_to_bottom)
-        self.btn_ltr = tk.Button(self.mid_frame, text=">>", command=self.move_to_right)
-        self.btn_rtl = tk.Button(self.mid_frame, text="<<", command=self.move_to_left)
+        # images
+        # self.left_arrow_img = tk.PhotoImage(file='./src/arrows/thin-long-left-arrow32.png')
+
+        self.btn_up = tk.Button(self.mid_frame, text="move up", command=self.move_up,width=16, height=1)
+        self.btn_down = tk.Button(self.mid_frame, text="move Down", command=self.move_down,width=16, height=1)
+        self.btn_top = tk.Button(self.mid_frame, text="move to Top", command=self.move_to_top,width=16, height=1)
+        self.btn_bottom = tk.Button(self.mid_frame, text="move to Bottom", command=self.move_to_bottom,width=16, height=1)
+        self.btn_ltr = tk.Button(self.mid_frame, text=">>", command=self.move_to_right,width=16, height=1)
+        self.btn_rtl = tk.Button(self.mid_frame, text="<<", command=self.move_to_left,width=16, height=1)
+        # self.btn_rtl = tk.Button(self.mid_frame, image=self.left_arrow_img, command=self.move_to_left, width=64, height=32)
 
         # Rightmost side: select directory, batch list, etc.
         self.btn_folder = tk.Button(self.functions_frame, text='Select Folder', command=self.select_folder)
