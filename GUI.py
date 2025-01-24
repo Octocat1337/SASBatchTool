@@ -80,7 +80,7 @@ class ProgressWindow(tk.Toplevel):
         self.update_idletasks()
         self.center_relative_to_master()  # Call the new centering function
         # Bind the <Configure> event of the master window
-        self.master.bind("<Configure>", self.recenter)
+        self.recenter_id = self.master.bind("<Configure>", self.recenter)
 
     def center_relative_to_master(self):
         master_x = self.master.winfo_rootx()
@@ -104,6 +104,7 @@ class ProgressWindow(tk.Toplevel):
     def stop(self):
         if self.running:
             self.running = False
+            self.master.unbind("<Configure>",self.recenter_id)
             self.progress.stop()
             self.destroy()
 
@@ -165,8 +166,8 @@ class MainWindow:
         self.testnum = 0
         self.root = tk.Tk()
         self.root.title("Batch Tool")
-        self.root.geometry("600x500")
-        self.root.maxsize(800, 700)
+        self.root.geometry("800x600")
+        self.root.maxsize(1000, 700)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
@@ -187,9 +188,9 @@ class MainWindow:
         # top searchbar frame
         self.top_searchbar_frame = tk.Frame(self.outer_frame, bg="seashell3")
 
-        self.left_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
+        self.left_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED, font=("Arial",14))
         self.mid_frame = tk.Frame(self.outer_frame, bg="seashell3")
-        self.right_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED)
+        self.right_listbox = tk.Listbox(self.outer_frame, bg="AntiqueWhite1", selectmode=tk.EXTENDED,font=("Arial",14))
         # right functions frame
         self.functions_frame = tk.Frame(self.outer_frame, bg="seashell3")
         self.functions_frame.rowconfigure(0, weight=1)
