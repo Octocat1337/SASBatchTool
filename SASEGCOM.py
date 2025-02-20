@@ -3,7 +3,7 @@ from datetime import datetime
 import win32com.client
 import os
 from pathlib import Path
-from charset_normalizer import detect
+import chardet
 import codecs
 
 
@@ -45,10 +45,10 @@ class SASEGHandler:
             realcwd1 = cwd.replace("\'", "")
             realcwd2 = realcwd1.replace("\\", "/")
             realcwd3 = realcwd2.replace("Z:", "/data1")
-            file_path = realcwd3 + '/' + file
+            file_path = realcwd3 + '/' + file # /data1/.../xx.sas
 
             # file_path_raw = cwd + '/' + file
-            file_path_raw = os.path.join(cwd,file)
+            file_path_raw = os.path.normpath(os.path.join(cwd, file)) # Z:\...\xx.sas
 
             # for log: EG scripting bug, it always picks current disk
             # thus we cannot run it from local, otherwise it starts with C:/
@@ -60,10 +60,9 @@ class SASEGHandler:
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S")
                 print(f'{current_time} Batching: {file_path_raw}')
-                print('raw_path: '+ file_path_raw)
 
                 # transcoding
-                self.transcode_to_utf8(filename=file_path_raw, newfilename=file_path_raw)
+                self.transcode_to_utf8(filetype='sas program', filename=file_path_raw, newfilename=file_path_raw)
 
                 app = win32com.client.Dispatch(f"SASEGObjectModel.Application.{self.EG_VERSION}")
                 app.SetActiveProfile(self.PROFILE_NAME)
@@ -78,8 +77,8 @@ class SASEGHandler:
 
                 # convert log file name to utf-8
                 log_name_full = realcwd2 + '/' + file_name + '.log'
-                print('Transcoding to UTF-8')
-                self.transcode_to_utf8(filename=log_name_full, newfilename=log_name_full)
+                # print('Transcoding to UTF-8')
+                self.transcode_to_utf8(filetype='log', filename=log_name_full, newfilename=log_name_full)
                 print('Batch Done')
             else:
                 print('file path not recognized by os: ')
@@ -114,21 +113,23 @@ class SASEGHandler:
             sleep(2)
 
     # TODO: need to test on large log file. Should I read by chunk ?
-    def transcode_to_utf8(self, filename='', newfilename='', encoding_from='GB2312', encoding_to='UTF-8'):
+    def transcode_to_utf8(self, filetype='', filename='', newfilename='', encoding_from='GB2312',
+                          encoding_to='UTF-8-BOM'):
 
         with open(filename, 'rb') as f:
-            encoding_info = detect(f.read())
+            encoding_info = chardet.detect(f.read())
         encoding = encoding_info['encoding']
-        print('encoding info: ' + encoding)
+        # print(filetype + ' encoding: ' + encoding)
 
         if 'utf-8' in encoding.lower():
-            print('encoding is utf-8, return')
+            print(filetype + ' encoding is utf-8, conversion skipped')
             return
 
-        with codecs.open(filename, 'rb', encoding=encoding) as f:
+        with codecs.open(filename, 'rb', encoding='gb18030') as f:
             bcontent = f.read()
             with open(newfilename, 'wb+') as f2:
-                f2.write(codecs.encode(bcontent, 'utf_8'))
+                f2.write(codecs.encode(bcontent, 'utf_8_sig'))
+                print(filetype + ' converted to UTF-8-BOM')
 
         # with open(filename, 'r', encoding=encoding_from) as fr:
         #     content = fr.read()
