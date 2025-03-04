@@ -788,7 +788,7 @@ class MainWindow:
         '''
 
         # 1. get search text
-        text = self.searchbar.get()
+        text = self.searchbar.get().strip()
 
         if text == '':
             # Case 1: User searched nothing
@@ -797,18 +797,18 @@ class MainWindow:
             # Case 2: After normal search, user wants to proceed
             else:
                 self.reset_search()
-                self.btn_search.config(state='normal')
-                self.btn_reset_searchbar.config(state='disabled')
+
         else:
             self.search_performed = True
             self.btn_search.config(state='disabled')
             self.btn_reset_searchbar.config(state='normal')
+            self.searchbar.unbind('<Return>')
 
         # 2. record current state
         self.left_list = list(self.left_listbox.get(0, tk.END))
         self.right_list = list(self.right_listbox.get(0, tk.END))
 
-        # 3. search two lists, remove found results from original lists
+        # 3. search both lists, remove found results from original lists
         result_left = []
         result_right = []
 
@@ -830,7 +830,7 @@ class MainWindow:
         # self.left_list = new_left_list
         # self.right_list = new_right_list
 
-        # 4. now result_ has the results, update the two list views
+        # 4. now result_: has the results, update the two list views
 
         self.build_left_list(result_left)
         self.build_right_list(result_right)
@@ -843,13 +843,14 @@ class MainWindow:
         :return:
         '''
 
-        text = self.searchbar.get()
+        text = self.searchbar.get().strip()
         if text == '' and not self.search_performed:
             return
         else:
             self.btn_search.config(state='normal')
             self.btn_reset_searchbar.config(state='disabled')
             self.search_performed = False
+            self.searchbar.bind('<Return>', self.search_event)
 
         self.searchbar.delete(0, tk.END)
         left_list_tuple = self.left_listbox.get(0, tk.END)
