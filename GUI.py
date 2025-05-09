@@ -633,13 +633,14 @@ class MainWindow:
             self.excel_thread.daemon = True
             self.excel_thread.start()
         else:
+            print('Please run Get Topline in TLF folders')
             return
 
     def get_topline_tlf_run(self):
         # self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder,dummy=True)
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        # file_list_r = self.EXCELHandler.get_filelist(type='topline')
-        file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline', root=self.root)
+        file_list_r = self.EXCELHandler.get_filelist(type='topline',root=self.root)
+        # file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline', root=self.root)
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -792,7 +793,8 @@ class MainWindow:
 
         if text == '':
             # Case 1: User searched nothing
-            if not self.search_performed:
+            print(self.search_performed)
+            if self.search_performed:
                 return
             # Case 2: After normal search, user wants to proceed
             else:

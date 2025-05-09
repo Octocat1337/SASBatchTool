@@ -83,6 +83,7 @@ class EXCELHandler:
                 self.combine_pos = num + 1
             elif header.lower() == 'topline':
                 self.topline_pos = num + 1
+                print(f'found topline column position: {self.topline_pos}')
             elif header.lower() == 'in-text':
                 self.intext_pos = num + 1
             elif header.lower() == 'program':
@@ -94,9 +95,10 @@ class EXCELHandler:
 
         return_list = []
         if type == 'topline':
+            print('Getting Topline TLFs')
             # get topline
-            for num in range(row_end):
-                row = num + 1
+            for num in range(1,row_end):
+                row = num + 1 # first row is title, skip it
                 istopline = TLF_sheet.Rows.Item(row).Columns.Item(self.topline_pos).Text
                 if istopline.lower() == 'y':
                     if self.is_qc:
@@ -107,7 +109,7 @@ class EXCELHandler:
 
         if type == 'combine':
             # get combine
-            for num in range(row_end):
+            for num in range(1,row_end):
                 row = num + 1
                 iscombine = TLF_sheet.Rows.Item(row).Columns.Item(self.combine_pos).Text
                 if iscombine.lower() == 'y':
@@ -118,7 +120,7 @@ class EXCELHandler:
 
         if type == 'in-text':
             # get combine
-            for num in range(row_end):
+            for num in range(1,row_end):
                 row = num + 1
                 isin_text = TLF_sheet.Rows.Item(row).Columns.Item(self.intext_pos).Text
                 if isin_text.lower() == 'y':

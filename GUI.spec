@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='SimpleBatchToolV0.4',
+    name='BatchToolV0.4.1',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
