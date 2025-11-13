@@ -94,40 +94,51 @@ class EXCELHandler:
                 break
 
         return_list = []
+        program_name = ''
         if type == 'topline':
-            print('Getting Topline TLFs')
+            # print('Getting Topline TLFs')
             # get topline
             for num in range(1,row_end):
                 row = num + 1 # first row is title, skip it
                 istopline = TLF_sheet.Rows.Item(row).Columns.Item(self.topline_pos).Text
                 if istopline.lower() == 'y':
                     if self.is_qc:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text
+                        if program_name != '':
+                            return_list.append(program_name + '.sas')
                     else:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text
+                        if program_name != '':
+                            return_list.append( program_name + '.sas')
 
 
         if type == 'combine':
-            # get combine
             for num in range(1,row_end):
                 row = num + 1
                 iscombine = TLF_sheet.Rows.Item(row).Columns.Item(self.combine_pos).Text
                 if iscombine.lower() == 'y':
                     if self.is_qc:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text
+                        if program_name != '':
+                            return_list.append(program_name + '.sas')
                     else:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text
+                        if program_name != '':
+                            return_list.append( program_name + '.sas')
 
         if type == 'in-text':
-            # get combine
             for num in range(1,row_end):
                 row = num + 1
                 isin_text = TLF_sheet.Rows.Item(row).Columns.Item(self.intext_pos).Text
                 if isin_text.lower() == 'y':
                     if self.is_qc:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.qcprogram_pos).Text
+                        if program_name != '':
+                            return_list.append(program_name + '.sas')
                     else:
-                        return_list.append(TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text + '.sas')
+                        program_name = TLF_sheet.Rows.Item(row).Columns.Item(self.program_pos).Text
+                        if program_name != '':
+                            return_list.append( program_name + '.sas')
 
 
         # in the end, close the workbook and the excel

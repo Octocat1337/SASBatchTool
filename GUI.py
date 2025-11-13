@@ -375,24 +375,29 @@ class MainWindow:
         else:
             self.current_folder = folderpath
 
-        if selected_folder != '':
+        if selected_folder == '':
+            return
+        else:
             self.current_folder = selected_folder
 
-        # print(f'after select folder button: {self.current_folder}')
-        self.update_current_folder_text()
+            # print(f'after select folder button: {self.current_folder}')
+            self.update_current_folder_text()
 
-        # get all files ending with .sas in the current folder
-        all_files = os.listdir(self.current_folder)
-        all_files.sort()
-        self.current_folder_files = []
-        for file in all_files:
-            if file.endswith(".sas"):
-                self.current_folder_files.append(file)
+            # get all files ending with .sas in the current folder
+            all_files = os.listdir(self.current_folder)
+            all_files.sort()
+            self.current_folder_files = []
+            for file in all_files:
+                if file.endswith(".sas"):
+                    self.current_folder_files.append(file)
 
-        self.empty_left_list()
-        self.empty_right_list()
-        self.build_left_list_from_folder()
-        self.root.update()
+            self.left_list = []
+            self.right_list = []
+            self.empty_left_list()
+            self.empty_right_list()
+            self.build_left_list_from_folder()
+            self.root.update()
+
 
     def build_left_list_from_folder(self):
         '''
@@ -641,6 +646,10 @@ class MainWindow:
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
         file_list_r = self.EXCELHandler.get_filelist(type='topline',root=self.root)
         # file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline', root=self.root)
+        file_list_r_set = set(file_list_r)
+        file_list_r = list(file_list_r_set)
+        file_list_r.sort()
+
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -678,6 +687,10 @@ class MainWindow:
     def get_intext_tlf_run(self):
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
         file_list_r = self.EXCELHandler.get_filelist(type='in-text', root=self.root)
+        # remove duplicates:
+        file_list_r_set = set(file_list_r)
+        file_list_r = list(file_list_r_set)
+        file_list_r.sort()
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -715,6 +728,9 @@ class MainWindow:
     def get_combine_tlf_run(self):
         self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
         file_list_r = self.EXCELHandler.get_filelist(type='combine', root=self.root)
+        file_list_r_set = set(file_list_r)
+        file_list_r = list(file_list_r_set)
+        file_list_r.sort()
 
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
@@ -793,7 +809,7 @@ class MainWindow:
 
         if text == '':
             # Case 1: User searched nothing
-            print(self.search_performed)
+            # print(self.search_performed)
             if self.search_performed:
                 return
             # Case 2: After normal search, user wants to proceed
@@ -869,6 +885,9 @@ class MainWindow:
         for item in left_list_tuple:
             if item in right_set:
                 self.right_list.remove(item)
+
+        # test:
+        # print('in reset_search')
 
         # append to left list
         for item in left_list_tuple:
