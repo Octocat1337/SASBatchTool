@@ -395,6 +395,7 @@ class MainWindow:
             self.right_list = []
             self.empty_left_list()
             self.empty_right_list()
+            self.reset_search()
             self.build_left_list_from_folder()
             self.root.update()
 
