@@ -2,7 +2,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
-import SASEGCOM, EXCELCOM
+import SASEGCOM, EXCELCOM, EXCELPANDAS
 import json
 import threading
 
@@ -264,9 +264,12 @@ class MainWindow:
         self.btn_folder = tk.Button(self.functions_frame, text='Select Folder', command=self.select_folder)
         self.btn_load_batch_list = tk.Button(self.functions_frame, text='Load Batch List', command=self.load_batch_list)
         self.btn_save_batch_list = tk.Button(self.functions_frame, text='Save Batch List', command=self.save_batch_list)
-        self.btn_get_topline_tlf = tk.Button(self.functions_frame, text='Get Topline TLF', command=self.get_topline_tlf)
-        self.btn_get_intext_tlf = tk.Button(self.functions_frame, text='Get In-Text TLF', command=self.get_intext_tlf)
-        self.btn_get_combine_tlf = tk.Button(self.functions_frame, text='Get Combine TLF', command=self.get_combine_tlf)
+        self.btn_get_topline_tlf = (
+            tk.Button(self.functions_frame, text='Get Topline TLF', command=lambda: self.get_tlf('topline')))
+        self.btn_get_intext_tlf = (
+            tk.Button(self.functions_frame, text='Get In-Text TLF', command=lambda: self.get_tlf('in-text')))
+        self.btn_get_combine_tlf = (
+            tk.Button(self.functions_frame, text='Get Combine TLF', command=lambda: self.get_tlf('combine')))
         # self.btn_batch = tk.Button(self.functions_frame, text="Batch", command=self.batch_run, bg="green", fg="white")
         self.btn_batch = tk.Button(self.functions_frame, text="Batch",
                                    command=self.run_batch_thread, bg="#385f30", fg="white", font=("Arial", 16))
@@ -419,14 +422,65 @@ class MainWindow:
         move list items from left list to right list
         :return:
         """
-        # get selected items from left: tuple
+        # 1. Get selected indices from the left listbox
         selected_indices = self.left_listbox.curselection()
-        # append to right list
-        for index in selected_indices:
-            self.right_listbox.insert(tk.END, self.left_listbox.get(index))
+        if not selected_indices:
+            return
 
-        # remove from left list, from bottom to top
-        for index in selected_indices[::-1]:
+        # 2. Capture data from LEFT list (Text + Color) before deleting
+        # We store as (text, is_red) tuples
+        new_items_to_move = []
+        for index in selected_indices:
+            item_text = self.left_listbox.get(index)
+            # Check if the item in the LEFT list is red
+            is_red = self.left_listbox.itemcget(index, 'foreground') == 'red'
+            new_items_to_move.append((item_text, is_red))
+
+        # 3. Capture current data from RIGHT list (Text + Color)
+        all_right_items = []
+        for i in range(self.right_listbox.size()):
+            text = self.right_listbox.get(i)
+            is_red = self.right_listbox.itemcget(i, 'foreground') == 'red'
+            all_right_items.append((text, is_red))
+
+        # 4. Combine the lists (Append new items to the bottom, preserve order)
+        current_right_names = {item[0] for item in all_right_items}
+        added_count = 0
+
+        for item_text, is_red in new_items_to_move:
+            if item_text not in current_right_names:
+                all_right_items.append((item_text, is_red))
+                added_count += 1
+
+        # 5. Specific Reordering: Move _checklog.sas to the very end
+        log_file_entry = None
+        for entry in all_right_items:
+            if entry[0] == "_checklog.sas":
+                log_file_entry = entry
+                break
+
+        if log_file_entry:
+            all_right_items.remove(log_file_entry)
+            all_right_items.append(log_file_entry)
+
+        # 6. Rebuild the RIGHT listbox
+        self.right_listbox.delete(0, tk.END)
+        for text, was_red in all_right_items:
+            self.right_listbox.insert(tk.END, text)
+            if was_red:
+                self.right_listbox.itemconfig(tk.END, foreground='red')
+
+        # 7. SCROLL to the new items
+        # We scroll to the index where the first new item in the batch was added
+        if all_right_items:
+            # Calculate the start index of the newly added items
+            # Subtracting 1 for log_file if it was moved to the end
+            new_item_index = len(all_right_items) - added_count - (1 if log_file_entry else 0)
+            self.right_listbox.see(max(0, new_item_index))
+
+        # 8. Safe DELETE from the LEFT listbox (Reverse order)
+        # Reverse order is essential so indices don't shift during deletion
+        for index in sorted(selected_indices, reverse=True):
             self.left_listbox.delete(index)
 
     def move_to_left(self):
@@ -632,26 +686,27 @@ class MainWindow:
         with open(filename, 'w') as f:
             f.write(batchlist)
 
-    def get_topline_tlf(self):
+    def get_tlf(self,tlf_type):
         if 'program' in self.current_folder \
                 and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
-            self.excel_thread = threading.Thread(target=self.get_topline_tlf_run)
+            self.excel_thread = threading.Thread(target=self.get_tlf_run, args=(tlf_type,))
             self.excel_thread.daemon = True
             self.excel_thread.start()
         else:
-            print('Please run Get Topline in TLF folders')
+            #TODO: Need a pop-up here
+            print('Please change current folder location to /program/tlf or qc/program/qctlf')
             return
 
-    def get_topline_tlf_run(self):
+    def get_tlf_run(self,tlf_type):
         # self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder,dummy=True)
-        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        file_list_r = self.EXCELHandler.get_filelist(type='topline',root=self.root)
+        # self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
+        self.EXCELHandler = EXCELPANDAS.EXCELHandler2(folder=self.current_folder)
+        file_list_r = self.EXCELHandler.get_filelist(tlf_type=tlf_type,root=self.root)
         # file_list_r = self.EXCELHandler.get_filelist_dummy(type='topline', root=self.root)
         file_list_r_set = set(file_list_r)
         file_list_r = list(file_list_r_set)
         file_list_r.sort()
 
-
         # still, read all files in the batch list file folder
         file_list_tmp = os.listdir(self.current_folder)
 
@@ -677,87 +732,7 @@ class MainWindow:
         for index, item in enumerate(file_list_r):
             if item in file_not_exist_set:
                 self.right_listbox.itemconfig(index, foreground='red')
-
-    def get_intext_tlf(self):
-        if 'program' in self.current_folder \
-                and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
-            self.excel_thread = threading.Thread(target=self.get_intext_tlf_run)
-            self.excel_thread.daemon = True
-            self.excel_thread.start()
-
-    def get_intext_tlf_run(self):
-        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        file_list_r = self.EXCELHandler.get_filelist(type='in-text', root=self.root)
-        # remove duplicates:
-        file_list_r_set = set(file_list_r)
-        file_list_r = list(file_list_r_set)
-        file_list_r.sort()
-
-        # still, read all files in the batch list file folder
-        file_list_tmp = os.listdir(self.current_folder)
-
-        file_list_l = []
-        # get all files ending with .sas in the current folder
-        for file in file_list_tmp:
-            if file.endswith(".sas"):
-                file_list_l.append(file)
-
-        # compare with current all files, maybe something in batch list was deleted
-        # Case 1. right list has something that no longer exists
-        file_not_exist = list(set(file_list_r).difference(file_list_l))
-        file_not_exist_set = set(file_not_exist)
-        # Case 2. after case1, remove same items from left list
-        file_list_l = [x for x in file_list_l if x not in set(file_list_r)]
-
-        # in the end, build left list
-        self.empty_left_list()
-        for file in file_list_l:
-            self.left_listbox.insert(tk.END, file)
-        # build right list
-        self.build_right_list(file_list_r)
-        for index, item in enumerate(file_list_r):
-            if item in file_not_exist_set:
-                self.right_listbox.itemconfig(index, foreground='red')
-
-    def get_combine_tlf(self):
-        if 'program' in self.current_folder \
-                and ('tlf' in self.current_folder or 'qctlf' in self.current_folder):
-            self.excel_thread = threading.Thread(target=self.get_combine_tlf_run)
-            self.excel_thread.daemon = True
-            self.excel_thread.start()
-
-    def get_combine_tlf_run(self):
-        self.EXCELHandler = EXCELCOM.EXCELHandler(folder=self.current_folder)
-        file_list_r = self.EXCELHandler.get_filelist(type='combine', root=self.root)
-        file_list_r_set = set(file_list_r)
-        file_list_r = list(file_list_r_set)
-        file_list_r.sort()
-
-        # still, read all files in the batch list file folder
-        file_list_tmp = os.listdir(self.current_folder)
-
-        file_list_l = []
-        # get all files ending with .sas in the current folder
-        for file in file_list_tmp:
-            if file.endswith(".sas"):
-                file_list_l.append(file)
-
-        # compare with current all files, maybe something in batch list was deleted
-        # Case 1. right list has something that no longer exists
-        file_not_exist = list(set(file_list_r).difference(file_list_l))
-        file_not_exist_set = set(file_not_exist)
-        # Case 2. after case1, remove same items from left list
-        file_list_l = [x for x in file_list_l if x not in set(file_list_r)]
-
-        # in the end, build left list
-        self.empty_left_list()
-        for file in file_list_l:
-            self.left_listbox.insert(tk.END, file)
-        # build right list
-        self.build_right_list(file_list_r)
-        for index, item in enumerate(file_list_r):
-            if item in file_not_exist_set:
-                self.right_listbox.itemconfig(index, foreground='red')
+        # print('----- Exit get_tlf -----')
 
     def build_left_list(self, batchlist):
         self.left_listbox.delete(0, tk.END)
@@ -782,18 +757,53 @@ class MainWindow:
         pass
 
     def sort_left_list(self):
-        left_list = list(self.left_listbox.get(0, tk.END))
-        left_list.sort()
-        self.empty_left_list()
-        for file in left_list:
-            self.left_listbox.insert(tk.END, file)
+        combined_data = []
+        for i in range(self.left_listbox.size()):
+            item_text = self.left_listbox.get(i)
+            # Check if this specific index has a red foreground
+            is_red = self.left_listbox.itemcget(i, 'foreground') == 'red'
+            combined_data.append((item_text, is_red))
+
+        # 2. Sort the list of tuples
+        # By default, Python sorts tuples by the first element (the text)
+        combined_data.sort(key=lambda x: x[0].lower())  # .lower() ensures a proper A-Z sort
+
+        # 3. Clear the Listbox and re-insert items with their colors
+        self.left_listbox.delete(0, tk.END)
+
+        for text, was_red in combined_data:
+            # Insert the text at the end of the list
+            self.left_listbox.insert(tk.END, text)
+
+            # If it was red before, set it to red again
+            if was_red:
+                # 'end' refers to the item we just inserted
+                self.left_listbox.itemconfig(tk.END, foreground='red')
 
     def sort_right_list(self):
-        right_list = list(self.right_listbox.get(0, tk.END))
-        right_list.sort()
-        self.empty_right_list()
-        for file in right_list:
-            self.right_listbox.insert(tk.END, file)
+        combined_data = []
+        for i in range(self.right_listbox.size()):
+            item_text = self.right_listbox.get(i)
+            # Check if this specific index has a red foreground
+            is_red = self.right_listbox.itemcget(i, 'foreground') == 'red'
+            combined_data.append((item_text, is_red))
+
+        # 2. Sort the list of tuples
+        # By default, Python sorts tuples by the first element (the text)
+        combined_data.sort(key=lambda x: (x[0] == "_checklog.sas", x[0].lower()))  # .lower() ensures a proper A-Z sort
+
+        # 3. Clear the Listbox and re-insert items with their colors
+        self.right_listbox.delete(0, tk.END)
+
+        for text, was_red in combined_data:
+            # Insert the text at the end of the list
+            self.right_listbox.insert(tk.END, text)
+
+            # If it was red before, set it to red again
+            if was_red:
+                # 'end' refers to the item we just inserted
+                self.right_listbox.itemconfig(tk.END, foreground='red')
+
 
     def search_event(self, event):
         self.search()
